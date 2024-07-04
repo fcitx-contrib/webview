@@ -413,6 +413,13 @@ WEBVIEW_API const webview_version_info_t *webview_version(void);
 #include <dlfcn.h>
 #endif
 
+#ifdef WKWEBVIEW_PROTOCOL
+#import <WebKit/WebKit.h>
+
+@interface FileSchemeHandler : NSObject <WKURLSchemeHandler>
+@end
+#endif
+
 namespace webview {
 
 using dispatch_fn_t = std::function<void()>;
@@ -1750,6 +1757,9 @@ public:
   cocoa_wkwebview_engine(bool debug, void *window)
       : m_debug{debug}, m_window{static_cast<id>(window)}, m_owns_window{
                                                                !window} {
+#ifdef WKWEBVIEW_PROTOCOL
+    schemeHandler = [[FileSchemeHandler alloc] init];
+#endif
     auto app = get_shared_application();
     // See comments related to application lifecycle in create_app_delegate().
     if (!m_owns_window) {
@@ -1823,6 +1833,9 @@ public:
     }
     // TODO: Figure out why m_manager is still alive after the autoreleasepool
     // has been drained.
+#ifdef WKWEBVIEW_PROTOCOL
+    [schemeHandler release];
+#endif
   }
 
 protected:
@@ -2146,6 +2159,9 @@ private:
 
     auto config = objc::autoreleased(
         objc::msg_send<id>("WKWebViewConfiguration"_cls, "new"_sel));
+#ifdef WKWEBVIEW_PROTOCOL
+    [config setURLSchemeHandler:schemeHandler forURLScheme:@WKWEBVIEW_PROTOCOL];
+#endif
 
     m_manager = objc::msg_send<id>(config, "userContentController"_sel);
     m_webview = objc::msg_send<id>("WKWebView"_cls, "alloc"_sel);
@@ -2264,6 +2280,9 @@ private:
   id m_webview{};
   id m_manager{};
   bool m_owns_window{};
+#ifdef WKWEBVIEW_PROTOCOL
+  FileSchemeHandler *schemeHandler;
+#endif
 };
 
 } // namespace detail
